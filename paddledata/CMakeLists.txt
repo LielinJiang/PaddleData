@@ -11,5 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+cmake_minimum_required(VERSION 3.16)
+project(paddledata  LANGUAGES C CXX CUDA)
 
-add_subdirectory(decode)
+find_package(CUDA 10.1 REQUIRED)
+set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
+
+list(APPEND CMAKE_MODULE_PATH ${CUDA_PATH}/lib64)
+
+list(APPEND COMMON_HEADER_DIRS
+  ${PROJECT_SOURCE_DIR}
+  ${CUDA_PATH}/include)
+
+set(COMMON_LIB_DIRS
+  ${CUDA_PATH}/lib64
+)
+
+INCLUDE(ExternalProject)
+
+add_subdirectory(src/decode)

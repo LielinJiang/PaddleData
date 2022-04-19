@@ -1,7 +1,7 @@
 import os
 import subprocess
 from pathlib import Path
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_packages
 from paddle.utils.cpp_extension import BuildExtension as PaddleBuildExtension
 
 
@@ -38,20 +38,28 @@ class BuildExtension(PaddleBuildExtension):
             self.extensions = no_custom_exts
             super(BuildExtension, self).build_extensions()
         self.extensions = custom_exts + no_custom_exts
+        print('debug:', self.extensions)
 
 
 class PaddleDataExtension(Extension):
-    def __init__(self, name, source_dir=None):
+    def __init__(self, name, source_dir="paddledata"):
         # A CMakeExtension needs a source_dir instead of a file list.
         Extension.__init__(self, name, sources=[])
         if source_dir is None:
             self.source_dir = str(Path(__file__).parent.resolve())
         else:
             self.source_dir = os.path.abspath(os.path.expanduser(source_dir))
-        # self.sources = _get_files(self.source_dir)
-        self.sources = _get_files(
-            os.path.
-            join(self.source_dir, "paddledata", "decode"))
+        
+        src_dir = os.path.join(self.source_dir, "src")
+        src_sub_dirs = os.listdir(src_dir)
+        self.sources = []
+        self.full_sub_dirs = []
+        for sub_dir in src_sub_dirs:
+            full_sub_dir = os.path.join(src_dir, sub_dir)
+            if os.path.isdir(full_sub_dir):
+                self.sources += _get_files(full_sub_dir)
+                self.full_sub_dirs.append(full_sub_dir)
+
         self._std_out_handle = None
 
     def build_with_command(self, ext_builder):
@@ -76,8 +84,7 @@ class PaddleDataExtension(Extension):
             # using -j in the build_ext call, not supported by pip or PyPA-build.
             if hasattr(ext_builder, "parallel") and ext_builder.parallel:
                 # CMake 3.12+ only.
-                build_args += ["-j{}".format(16)]
-                # build_args += ["-j{}".format(ext_builder.parallel)]
+                build_args += ["-j{}".format(ext_builder.parallel)]
 
         if not os.path.exists(ext_builder.build_temp):
             os.makedirs(ext_builder.build_temp)
@@ -99,18 +106,27 @@ class PaddleDataExtension(Extension):
         print('finish01')
         print(ext_builder.build_temp)
         print(ext_builder.build_lib)
-        ext_builder.copy_tree(
-                os.path.join(ext_builder.build_temp, "paddledata", "decode", "libs"),
-                ext_builder.build_lib)
+        print(self.full_sub_dirs)
+        # ext_builder.copy_tree(
+        #         os.path.join(ext_builder.build_temp, "paddledata", "decode", "libs"),
+        #         ext_builder.build_lib)
 
     def get_target_filename(self):
         return "libimage_decode_op.so"
+        # raise NotImplementedError
+
+package_name = "paddledata"
+cwd = os.path.dirname(os.path.abspath(__file__))
 
 setup(
-    name='PaddleData',
+    name=package_name,
+    packages=find_packages(),
+    package_data={package_name: ["*.dll", "*.dylib", "*.so"]},
     ext_modules=[
-        PaddleDataExtension("libimage_decode_op", "./")
+        PaddleDataExtension("libimage_decode_op")
         ],
     cmdclass={'build_ext' : BuildExtension.with_options(
-        output_dir=r'libs')
-    })
+        output_dir=os.path.join(cwd, package_name)
+    )
+        },
+    )
