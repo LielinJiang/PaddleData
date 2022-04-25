@@ -1,8 +1,10 @@
+import os
 import paddle
 from paddle.fluid.layers import utils
 from paddle.fluid.layer_helper import LayerHelper
 
-decoding_lib = "decode/build/libimage_decode_op.so"
+cwd = os.path.dirname(os.path.abspath(__file__))
+decoding_lib = os.path.join(cwd, "libimage_decode_op.so")
 
 ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(decoding_lib)
 
@@ -47,15 +49,14 @@ def decode_random_crop(x,
             for j in []:
                 ctx.add_attr(j)
             for out_name in out_names:
-                outs[out_name] = [core.eager.Tensor(), core.eager.Tensor()]
+                outs[out_name] = [core.eager.Tensor() for _ in range(len(x))]
                 ctx.add_outputs(outs[out_name])
             core.eager._run_custom_op(ctx, "custom_decode", True)
         else:
             for out_name in out_names:
-                outs[out_name] = [VarBase(), VarBase()]
+                outs[out_name] = [VarBase() for _ in range(len(x))]
             _dygraph_tracer().trace_op(type="custom_decode", inputs=ins, outputs=outs, attrs=attrs)
     else:
-        print('custom op type:', type(x), len(x))
         helper = LayerHelper("custom_decode", **locals())
         x_dtype = x[0].dtype
         for out_name in out_names:
