@@ -10,11 +10,9 @@ ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(decoding_lib)
 
 
 def decode_random_crop(x,
-                    mode='unchanged',
                     num_threads=2,
                     host_memory_padding=0,
                     device_memory_padding=0,
-                    data_layout='NCHW',
                     aspect_ratio_min=3./4.,
                     aspect_ratio_max=4./3.,
                     area_min=0.08,
@@ -24,11 +22,10 @@ def decode_random_crop(x,
     local_rank = paddle.distributed.get_rank()
     program_id = utils._hash_with_id(mode, num_threads, "custom_decode", local_rank)
     ins = {'X@VECTOR' : x}
-    attrs = {"mode": mode,
+    attrs = {
              "num_threads": num_threads,
              "local_rank": local_rank,
              "program_id": program_id,
-             "mode": mode,
              "host_memory_padding": host_memory_padding,
              "device_memory_padding": device_memory_padding,
              "aspect_ratio_min": aspect_ratio_min,
@@ -67,4 +64,3 @@ def decode_random_crop(x,
     res = [outs[out_name] for out_name in out_names]
 
     return res[0] if len(res)==1 else res
-

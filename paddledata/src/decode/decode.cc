@@ -14,7 +14,6 @@ using namespace cv;
 std::vector<paddle::Tensor> 
 decode_cuda_forward(const std::vector<paddle::Tensor>& x,
                     int num_threads,
-                    std::string mode,
                     int local_rank,
                     int64_t program_id);
 
@@ -35,7 +34,6 @@ std::vector<paddle::Tensor> DecodeForward(
                         const int num_threads,
                         const int local_rank,
                         const int64_t program_id,
-                        std::string mode,
                         const int64_t host_memory_padding,
                         const int64_t device_memory_padding,
                         float aspect_ratio_min,
@@ -46,20 +44,12 @@ std::vector<paddle::Tensor> DecodeForward(
 
   auto* decode_pool = 
     ImageDecoderThreadPoolManager::Instance()->GetDecoderThreadPool(
-                        program_id, num_threads, mode, local_rank,
+                        program_id, num_threads, local_rank,
                         static_cast<size_t>(host_memory_padding),
                         static_cast<size_t>(device_memory_padding));
-  // nvjpegHandle_t nvjpeg_handle = nullptr;
-  // nvjpegStatus_t create_status = nvjpegCreateSimple(&nvjpeg_handle);
-  // std::cout << "nvjpeg status: " << create_status << " " << NVJPEG_STATUS_SUCCESS<< std::endl;
   int batch_size = x.size();
 
-  // auto aspect_ratio_min = ctx.Attr<float>("aspect_ratio_min");
-  // auto aspect_ratio_max = ctx.Attr<float>("aspect_ratio_max");
   AspectRatioRange aspect_ratio_range{aspect_ratio_min, aspect_ratio_max};
-
-  // auto area_min = ctx.Attr<float>("area_min");
-  // auto area_max = ctx.Attr<float>("area_max");
   AreaRange area_range{area_min, area_max};
 
   auto* generators = GeneratorManager::Instance()->GetGenerators(
@@ -101,31 +91,21 @@ std::vector<paddle::Tensor> DecodeForward(
   decode_pool->RunAll(true);
   
   std::vector<paddle::Tensor> outs_tansposed;
-
-  // std::vector<int> axis = {2, 0, 1};
-  // for (size_t i = 0; i < outs.size(); i++) {
-
-  //   std::cout << "transpose tensor: " << i << std::endl;
-  //   paddle::Tensor trans_out = paddle::experimental::transpose(outs[i], axis);
-  //   outs_tansposed.push_back(trans_out);
-  // }
-  // std::cout << "outputs size: " << outs.size() << std::endl;
   return outs;
 }
 
 std::vector<std::vector<int64_t>> DecodeForwardInferShape(
   const std::vector<std::vector<int64_t>>& input_shapes
 ) {
-  // std::cout<< "infer shapes:" << std::endl;
   return input_shapes;
 }
+
 PD_BUILD_OP(custom_decode)
     .Inputs({paddle::Vec("X")})
     .Outputs({paddle::Vec("Out")})
     .Attrs({"num_threads: int",
              "local_rank: int",
              "program_id: int64_t",
-             "mode: std::string",
              "host_memory_padding: int64_t",
              "device_memory_padding: int64_t",
              "aspect_ratio_min: float",
@@ -134,4 +114,3 @@ PD_BUILD_OP(custom_decode)
              "area_max: float"})
     .SetKernelFn(PD_KERNEL(DecodeForward))
     .SetInferShapeFn(PD_INFER_SHAPE(DecodeForwardInferShape));
-

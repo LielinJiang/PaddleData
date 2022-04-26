@@ -18,53 +18,41 @@ limitations under the License. */
 // namespace operators {
 // namespace data {
 
-ImageDecoder::ImageDecoder(std::string mode, int dev_id,
+ImageDecoder::ImageDecoder(int dev_id,
                            size_t host_memory_padding,
                            size_t device_memory_padding) 
   : nvjpeg_streams_(2),
     pinned_buffers_(2),
-    page_id_(0),
-    mode_(mode) {
-  // platform::SetDeviceId(dev_id);
+    page_id_(0){
+
   cudaSetDevice(dev_id);
-  // create nvjpeg handle and stream
-  // PADDLE_ENFORCE_NVJPEG_SUCCESS(
+
   nvjpegCreateEx(NVJPEG_BACKEND_HYBRID, &device_allocator_,
                         &pinned_allocator_, 0, &handle_);
-  // PADDLE_ENFORCE_NVJPEG_SUCCESS(
-  //     platform::dynload::nvjpegCreateEx(NVJPEG_BACKEND_HYBRID, &device_allocator_,
-  //                          &pinned_allocator_, 0, &handle_));
 
   // set pinned/device memory padding
   if (host_memory_padding > 0) {
     nvjpegSetPinnedMemoryPadding(host_memory_padding, handle_);
-    // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegSetPinnedMemoryPadding(host_memory_padding, handle_));
   }
   if (device_memory_padding > 0) {
     nvjpegSetDeviceMemoryPadding(device_memory_padding, handle_);
-    // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegSetDeviceMemoryPadding(device_memory_padding, handle_));
   }
 
   // create nvjpeg stream
   for (size_t i = 0; i < nvjpeg_streams_.size(); i++) {
     nvjpegJpegStreamCreate(handle_, &nvjpeg_streams_[i]);
-    // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegJpegStreamCreate(handle_, &nvjpeg_streams_[i]));
   }
 
   // create decode params, decoder and state
   nvjpegDecodeParamsCreate(handle_, &decode_params_);
   nvjpegDecoderCreate(handle_, NVJPEG_BACKEND_HYBRID, &decoder_);
   nvjpegDecoderStateCreate(handle_, decoder_, &state_);
-  // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegDecodeParamsCreate(handle_, &decode_params_));
-  // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegDecoderCreate(handle_, NVJPEG_BACKEND_HYBRID, &decoder_));
-  // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegDecoderStateCreate(handle_, decoder_, &state_));
 
   // create device & pinned buffer
   nvjpegBufferDeviceCreate(handle_, &device_allocator_, &device_buffer_);
-  // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegBufferDeviceCreate(handle_, &device_allocator_, &device_buffer_));
+  
   for (size_t i = 0; i < pinned_buffers_.size(); i++) {
     nvjpegBufferPinnedCreate(handle_, &pinned_allocator_, &pinned_buffers_[i]);
-    // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegBufferPinnedCreate(handle_, &pinned_allocator_, &pinned_buffers_[i]));
   }
 }
 
@@ -72,27 +60,22 @@ ImageDecoder::~ImageDecoder() {
   // destroy nvjpeg streams
   for (size_t i = 0; i < nvjpeg_streams_.size(); i++) {
     nvjpegJpegStreamDestroy(nvjpeg_streams_[i]);
-    // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegJpegStreamDestroy(nvjpeg_streams_[i]));
   }
 
   // destroy decode params, decoder and state
   nvjpegDecodeParamsDestroy(decode_params_);
   nvjpegDecoderDestroy(decoder_);
   nvjpegJpegStateDestroy(state_);
-  // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegDecodeParamsDestroy(decode_params_));
-  // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegDecoderDestroy(decoder_));
-  // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegJpegStateDestroy(state_));
-
+  
   nvjpegBufferDeviceDestroy(device_buffer_);
-  // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegBufferDeviceDestroy(device_buffer_));
+  
   for (size_t i = 0; i < pinned_buffers_.size(); i++) {
     nvjpegBufferPinnedDestroy(pinned_buffers_[i]);
-    // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegBufferPinnedDestroy(pinned_buffers_[i]));
   }
 
   // destroy nvjpeg handle at last
   nvjpegDestroy(handle_);
-  // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegDestroy(handle_));
+
 }
 
 void ImageDecoder::CPUDecodeRandomCrop(
@@ -126,7 +109,6 @@ void ImageDecoder::CPUDecodeRandomCrop(
   }
 
   // allocate cpu tensor and memory
-  // framework::LoDTensor cpu_tensor;
   std::vector<int64_t> out_shape = {height, width, 3};
   int64_t numel = height * width * 3;
 
@@ -165,25 +147,22 @@ nvjpegStatus_t ImageDecoder::ParseDecodeParams(
   output_components = 3;
 
   nvjpegDecodeParamsSetOutputFormat(decode_params_, output_format);
-  // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegDecodeParamsSetOutputFormat(decode_params_, output_format));
 
   if (roi_generator) {
     ROI roi;
     roi_generator->GenerateRandomROI(width, height, &roi);
 
     nvjpegDecodeParamsSetROI(decode_params_, roi.x, roi.y, roi.w, roi.h);
-    // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegDecodeParamsSetROI(decode_params_, roi.x, roi.y, roi.w, roi.h));
+    
     height = roi.h;
     width = roi.w;
   }
 
   std::vector<int64_t> out_shape = {height, width, output_components};
   outs->at(index) = paddle::Tensor(place, out_shape);
-  // out->reshape(out_shape);
 
   // allocate memory and assign to out_image
   auto* data = outs->at(index).mutable_data<uint8_t>(place);
-  // auto* data = out->mutable_data<uint8_t>(place);
   out_image->channel[0] = data;
   out_image->pitch[0] = output_components * width;
 
@@ -199,19 +178,14 @@ nvjpegStatus_t ImageDecoder::GPUDecodeRandomCrop(const uint8_t* bit_stream, size
   nvjpegJpegStreamParse(handle_, bit_stream, bit_len, false, false, stream);
   nvjpegStateAttachPinnedBuffer(state_, buffer);
   nvjpegStatus_t status = nvjpegDecodeJpegHost(handle_, decoder_, state_, decode_params_, stream);
-  // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegJpegStreamParse(handle_, bit_stream, bit_len, false, false, stream));
-  // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegStateAttachPinnedBuffer(state_, buffer));
-  // nvjpegStatus_t status = platform::dynload::nvjpegDecodeJpegHost(handle_, decoder_, state_, decode_params_, stream);
+  
   if (status != NVJPEG_STATUS_SUCCESS) return status;
 
   // transfer and decode to device buffer
   nvjpegStateAttachDeviceBuffer(state_, device_buffer_);
-  // platform::dynload::nvjpegStateAttachDeviceBuffer(state_, device_buffer_);
   nvjpegDecodeJpegTransferToDevice(handle_, decoder_, state_, stream, cuda_stream_);
   status = nvjpegDecodeJpegDevice(handle_, decoder_, state_, out_image, nullptr);
-  // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegStateAttachDeviceBuffer(state_, device_buffer_));
-  // PADDLE_ENFORCE_NVJPEG_SUCCESS(platform::dynload::nvjpegDecodeJpegTransferToDevice(handle_, decoder_, state_, stream, cuda_stream_));
-  // status = platform::dynload::nvjpegDecodeJpegDevice(handle_, decoder_, state_, out_image, nullptr);
+  
   return status;
 }
 
@@ -226,16 +200,14 @@ void ImageDecoder::Run(
   }
   status = GPUDecodeRandomCrop(bit_stream, bit_len, &image);
   if (status != NVJPEG_STATUS_SUCCESS) {
-    // std::cout << "use cpu decode" << std::endl;
     CPUDecodeRandomCrop(bit_stream, bit_len, roi_generator, nullptr, 0, outs, index, place);
   }
 }
 
 ImageDecoderThreadPool::ImageDecoderThreadPool(
-    const int num_threads, const std::string mode, const int dev_id,
+    const int num_threads, const int dev_id,
     const size_t host_memory_padding, const size_t device_memory_padding)
   : threads_(num_threads),
-    mode_(mode),
     dev_id_(dev_id),
     shutdown_(false),
     running_(false),
@@ -303,7 +275,7 @@ void ImageDecoderThreadPool::SortTaskByLengthDescend() {
 void ImageDecoderThreadPool::ThreadLoop(
       const int thread_idx, const size_t host_memory_padding,
       const size_t device_memory_padding) {
-  ImageDecoder* decoder = new ImageDecoder(mode_, dev_id_,
+  ImageDecoder* decoder = new ImageDecoder(dev_id_,
                                            host_memory_padding,
                                            device_memory_padding);
 
